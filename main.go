@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -79,7 +80,12 @@ func handleShorten(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	shortURL := fmt.Sprintf("http://localhost:8080/%s", slug)
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "http://localhost:8080"
+	}
+
+	shortURL := fmt.Sprintf("%s/%s", baseURL, slug)
 	json.NewEncoder(w).Encode(URLResponse{ShortURL: shortURL})
 }
 
@@ -160,7 +166,13 @@ func main() {
 	http.HandleFunc("/shorten", handleShorten)
 	http.HandleFunc("/", handleRedirect)
 
-	port := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = ":8080"
+	} else if port[0] != ':' {
+		port = ":" + port
+	}
+
 	fmt.Printf("Server starting on %s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
 }

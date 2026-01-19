@@ -8,6 +8,12 @@ Expects collusions, so it will retry with a longer string if a collision is foun
 
 Uses MariaDB as the database.
 
+## Configuration
+
+- `BASE_URL`: The base URL for the shortened links (default: `http://localhost:8080`).
+
+PORT=8081 BASE_URL=https://my-tinyurl.com go run main.go
+
 ## API
 
 POST /shorten - Shortens a URL
