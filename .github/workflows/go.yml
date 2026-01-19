@@ -14,13 +14,13 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      mysql:
+      mariadb:
         image: mariadb:latest
         env:
-          MYSQL_ROOT_PASSWORD: rootpassword
-          MYSQL_DATABASE: url_db
-          MYSQL_USER: explorer
-          MYSQL_PASSWORD: explorerpassword
+          MARIADB_ROOT_PASSWORD: rootpassword
+          MARIADB_DATABASE: url_db
+          MARIADB_USER: explorer
+          MARIADB_PASSWORD: explorerpassword
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=2
@@ -37,12 +37,12 @@ jobs:
         run: go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
       - name: Run DB migrations
-        run: /home/runner/go/bin/migrate -path ./mysql/migrations -database 'mysql://user:password@tcp(127.0.0.1:3306)/trailerrank' up
+        run: /home/runner/go/bin/migrate -path ./migrations -database 'mysql://explorer:explorerpassword@tcp(127.0.0.1:3306)/url_db' up
 
       - name: Build
         run: go build -v ./...
 
       - name: Test
         env:
-          MYSQL_URI: explorer:explorerpassword@tcp(127.0.0.1:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local
+          MARIADB_URI: explorer:explorerpassword@tcp(127.0.0.1:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local
         run: go test -v ./...
