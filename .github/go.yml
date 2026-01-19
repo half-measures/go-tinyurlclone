@@ -1,0 +1,48 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: GoV2
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mariadb:latest
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: url_db
+          MYSQL_USER: explorer
+          MYSQL_PASSWORD: explorerpassword
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.25.4"
+
+      - name: Install migrate
+        run: go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+
+      - name: Run DB migrations
+        run: /home/runner/go/bin/migrate -path ./mysql/migrations -database 'mysql://user:password@tcp(127.0.0.1:3306)/trailerrank' up
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        env:
+          MYSQL_URI: explorer:explorerpassword@tcp(127.0.0.1:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local
+        run: go test -v ./...

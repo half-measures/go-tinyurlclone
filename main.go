@@ -23,7 +23,20 @@ type URLResponse struct {
 	Error    string `json:"error,omitempty"`
 }
 
-var db *sql.DB
+type Server struct {
+	db      *sql.DB
+	baseURL string
+}
+
+func NewServer(db *sql.DB, baseURL string) *Server {
+	if baseURL == "" {
+		baseURL = os.Getenv("BASE_URL")
+		if baseURL == "" {
+			baseURL = "http://localhost:8080"
+		}
+	}
+	return &Server{db: db, baseURL: baseURL}
+}
 
 func generateSlug(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -35,7 +48,7 @@ func generateSlug(n int) string {
 	return string(ret)
 }
 
-func handleShorten(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleShorten(w http.ResponseWriter, r *http.Request) {
 	// Enable CORS
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -67,7 +80,7 @@ func handleShorten(w http.ResponseWriter, r *http.Request) {
 
 	for i := 0; i < maxRetries; i++ {
 		slug = generateSlug(length)
-		_, err := db.Exec("INSERT INTO urls (slug, long_url) VALUES (?, ?)", slug, req.LongURL)
+		_, err := s.db.Exec("INSERT INTO urls (slug, long_url) VALUES (?, ?)", slug, req.LongURL)
 		if err == nil {
 			break
 		}
@@ -80,16 +93,11 @@ func handleShorten(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	baseURL := os.Getenv("BASE_URL")
-	if baseURL == "" {
-		baseURL = "http://localhost:8080"
-	}
-
-	shortURL := fmt.Sprintf("%s/%s", baseURL, slug)
+	shortURL := fmt.Sprintf("%s/%s", s.baseURL, slug)
 	json.NewEncoder(w).Encode(URLResponse{ShortURL: shortURL})
 }
 
-func handleRedirect(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	slug := r.URL.Path[1:]
 	if slug == "" {
 		// If someone just hits localhost:8080/
@@ -98,7 +106,7 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var longURL string
-	err := db.QueryRow("SELECT long_url FROM urls WHERE slug = ?", slug).Scan(&longURL)
+	err := s.db.QueryRow("SELECT long_url FROM urls WHERE slug = ?", slug).Scan(&longURL)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.NotFound(w, r)
@@ -117,28 +125,27 @@ func main() {
 	// Format: user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
 	dsn := "explorer:explorerpassword@tcp(127.0.0.1:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local"
 
-	var err error
 	// Open connection
-	db, err = sql.Open("mysql", dsn)
+	tempDB, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("Error opening database connection: %v", err)
 	}
-	defer db.Close()
+	defer tempDB.Close()
 
 	// Connection Pool Settings
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
-	db.SetConnMaxIdleTime(2 * time.Minute)
+	tempDB.SetMaxOpenConns(25)
+	tempDB.SetMaxIdleConns(25)
+	tempDB.SetConnMaxLifetime(5 * time.Minute)
+	tempDB.SetConnMaxIdleTime(2 * time.Minute)
 
 	// Verify connection
-	err = db.Ping()
+	err = tempDB.Ping()
 	if err != nil {
 		log.Printf("Wait for MariaDB to start... (will retry)")
 
 		for i := 0; i < 10; i++ {
 			time.Sleep(2 * time.Second)
-			err = db.Ping()
+			err = tempDB.Ping()
 			if err == nil {
 				fmt.Println("Successfully connected to MariaDB!")
 				break
@@ -152,7 +159,7 @@ func main() {
 	}
 
 	// Create table if not exists
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS urls (
+	_, err = tempDB.Exec(`CREATE TABLE IF NOT EXISTS urls (
 		id INT AUTO_INCREMENT PRIMARY KEY,
 		slug VARCHAR(10) NOT NULL UNIQUE,
 		long_url TEXT NOT NULL,
@@ -162,9 +169,12 @@ func main() {
 		log.Fatalf("Error creating table: %v", err)
 	}
 
+	// Initialize server
+	s := NewServer(tempDB, "")
+
 	// Setup HTTP server
-	http.HandleFunc("/shorten", handleShorten)
-	http.HandleFunc("/", handleRedirect)
+	http.HandleFunc("/shorten", s.handleShorten)
+	http.HandleFunc("/", s.handleRedirect)
 
 	port := os.Getenv("PORT")
 	if port == "" {
