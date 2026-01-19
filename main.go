@@ -123,7 +123,10 @@ func (s *Server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// Connection string
 	// Format: user:password@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
-	dsn := "explorer:explorerpassword@tcp(127.0.0.1:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := os.Getenv("MARIADB_URI")
+	if dsn == "" {
+		dsn = "explorer:explorerpassword@tcp(127.0.0.1:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local"
+	}
 
 	// Open connection
 	tempDB, err := sql.Open("mysql", dsn)
