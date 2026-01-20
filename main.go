@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"golang.org/x/time/rate"
 )
 
 type URLRequest struct {
@@ -24,8 +27,10 @@ type URLResponse struct {
 }
 
 type Server struct {
-	db      *sql.DB
-	baseURL string
+	db       *sql.DB
+	baseURL  string
+	limiters map[string]*rate.Limiter
+	mu       sync.Mutex
 }
 
 func NewServer(db *sql.DB, baseURL string) *Server {
@@ -35,7 +40,39 @@ func NewServer(db *sql.DB, baseURL string) *Server {
 			baseURL = "http://localhost:8080"
 		}
 	}
-	return &Server{db: db, baseURL: baseURL}
+	return &Server{
+		db:       db,
+		baseURL:  baseURL,
+		limiters: make(map[string]*rate.Limiter),
+	}
+}
+
+func (s *Server) getLimiter(ip string, r rate.Limit, b int) *rate.Limiter {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	limiter, exists := s.limiters[ip]
+	if !exists {
+		limiter = rate.NewLimiter(r, b)
+		s.limiters[ip] = limiter
+	}
+
+	return limiter
+}
+
+func (s *Server) rateLimitMiddleware(next http.HandlerFunc, r rate.Limit, b int) http.HandlerFunc { //In addition to captcha, rate limiting is implemented to prevent abuse
+	return func(w http.ResponseWriter, req *http.Request) {
+		ip, _, err := net.SplitHostPort(req.RemoteAddr)
+		if err != nil {
+			ip = req.RemoteAddr // Fallback if no port
+		}
+		limiter := s.getLimiter(ip, r, b)
+		if !limiter.Allow() {
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+		next(w, req)
+	}
 }
 
 func generateSlug(n int) string {
@@ -161,7 +198,7 @@ func main() {
 		fmt.Println("Successfully connected to MariaDB!")
 	}
 
-	// Create table if not exists
+	// Create table if not exists, not using migrations for simplicity which could be a huge mistake later on
 	_, err = tempDB.Exec(`CREATE TABLE IF NOT EXISTS urls (
 		id INT AUTO_INCREMENT PRIMARY KEY,
 		slug VARCHAR(10) NOT NULL UNIQUE,
@@ -176,8 +213,10 @@ func main() {
 	s := NewServer(tempDB, "")
 
 	// Setup HTTP server
-	http.HandleFunc("/shorten", s.handleShorten)
-	http.HandleFunc("/", s.handleRedirect)
+	// POST /shorten: 2 requests per minute (approx 0.033 req/sec)
+	http.HandleFunc("/shorten", s.rateLimitMiddleware(s.handleShorten, rate.Every(30*time.Second), 2))
+	// GET /: 75 requests per minute (1.25 req/sec)
+	http.HandleFunc("/", s.rateLimitMiddleware(s.handleRedirect, rate.Every(800*time.Millisecond), 75))
 
 	port := os.Getenv("PORT")
 	if port == "" {
