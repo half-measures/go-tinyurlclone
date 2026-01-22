@@ -27,10 +27,11 @@ type URLResponse struct {
 }
 
 type Server struct {
-	db       *sql.DB
-	baseURL  string
-	limiters map[string]*rate.Limiter
-	mu       sync.Mutex
+	db            *sql.DB
+	baseURL       string
+	allowedOrigin string
+	limiters      map[string]*rate.Limiter
+	mu            sync.Mutex
 }
 
 func NewServer(db *sql.DB, baseURL string) *Server {
@@ -40,10 +41,15 @@ func NewServer(db *sql.DB, baseURL string) *Server {
 			baseURL = "http://localhost:8080"
 		}
 	}
+	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "*" // Default to broad for development if not set, but we will set it in docker-compose
+	}
 	return &Server{
-		db:       db,
-		baseURL:  baseURL,
-		limiters: make(map[string]*rate.Limiter),
+		db:            db,
+		baseURL:       baseURL,
+		allowedOrigin: allowedOrigin,
+		limiters:      make(map[string]*rate.Limiter),
 	}
 }
 
@@ -75,6 +81,21 @@ func (s *Server) rateLimitMiddleware(next http.HandlerFunc, r rate.Limit, b int)
 	}
 }
 
+func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", s.allowedOrigin)
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 func generateSlug(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	ret := make([]byte, n)
@@ -86,15 +107,6 @@ func generateSlug(n int) string {
 }
 
 func (s *Server) handleShorten(w http.ResponseWriter, r *http.Request) {
-	// Enable CORS
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	if r.Method == "OPTIONS" {
-		return
-	}
-
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -214,7 +226,7 @@ func main() {
 
 	// Setup HTTP server
 	// POST /shorten: 2 requests per minute (approx 0.033 req/sec)
-	http.HandleFunc("/shorten", s.rateLimitMiddleware(s.handleShorten, rate.Every(30*time.Second), 2))
+	http.HandleFunc("/shorten", s.corsMiddleware(s.rateLimitMiddleware(s.handleShorten, rate.Every(30*time.Second), 2)))
 	// GET /: 75 requests per minute (1.25 req/sec)
 	http.HandleFunc("/", s.rateLimitMiddleware(s.handleRedirect, rate.Every(800*time.Millisecond), 75))
 

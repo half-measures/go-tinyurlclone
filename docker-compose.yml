@@ -20,6 +20,7 @@ services:
     environment:
       MARIADB_URI: explorer:explorerpassword@tcp(mariadb:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local
       BASE_URL: http://localhost:8080
+      ALLOWED_ORIGIN: http://localhost:3000
     depends_on:
       - mariadb
 
