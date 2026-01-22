@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PUBLIC_API_URL } from "$env/static/public";
   let url = $state("");
   let isLoading = $state(false);
   let shortUrl = $state("");
@@ -12,7 +13,7 @@
     error = "";
 
     try {
-      const response = await fetch("http://localhost:8080/shorten", {
+      const response = await fetch(`${PUBLIC_API_URL}/shorten`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
