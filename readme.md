@@ -1,23 +1,33 @@
 ## Intro
 
 Uses Secure Random String algo of base-62 as usual with a char set of a-z, A-Z, 0-9.
-Expects collusions, so it will retry with a longer string if a collision is found.
+Expects collisions, so it will retry with a longer string if a collision is found.
 56 Billion possible strings of length 10.
 
-## DB
+## Running with Docker
 
-Uses MariaDB as the database.
+The entire stack can be started with a single command:
+
+```bash
+docker compose up --build
+```
+
+This will spin up:
+
+- **MariaDB**: Database (Port 3306)
+- **Go Backend**: API (Port 8080)
+- **Svelte Frontend**: UI (Port 3000)
+
+Once started, access the UI at [http://localhost:3000](http://localhost:3000). this was done thanks to the adapter change.
 
 ## Configuration
 
-- `BASE_URL`: The base URL for the shortened links (default: `http://localhost:8080`).
+Environment variables can be configured in `docker-compose.yml`:
 
-PORT=8081 BASE_URL=https://my-tinyurl.com go run main.go
+- `BASE_URL`: The base URL returned by the backend for shortened links.
+- `PUBLIC_API_URL`: The URL the frontend uses to contact the backend.
 
 ## API
 
-POST /shorten - Shortens a URL
-
-## Frontend
-
-Uses SvelteKit for the frontend.
+- `POST /shorten`: Shortens a URL.
+- `GET /:slug`: Redirects to the original URL.
