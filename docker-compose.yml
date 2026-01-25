@@ -19,19 +19,30 @@ services:
       - "8080:8080"
     environment:
       MARIADB_URI: explorer:explorerpassword@tcp(mariadb:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local
-      BASE_URL: http://localhost:8080
-      ALLOWED_ORIGIN: http://localhost:3000
+      BASE_URL: ${DOMAIN:-http://localhost}
+      ALLOWED_ORIGIN: ${DOMAIN:-http://localhost}
     depends_on:
       - mariadb
 
   frontend:
     build: ./gourl
     container_name: frontend_url
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     environment:
-      PUBLIC_API_URL: http://localhost:8080
+      PUBLIC_API_URL: ${DOMAIN:-http://localhost}
     depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_url
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
       - backend
 
 volumes:

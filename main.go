@@ -68,9 +68,13 @@ func (s *Server) getLimiter(ip string, r rate.Limit, b int) *rate.Limiter {
 
 func (s *Server) rateLimitMiddleware(next http.HandlerFunc, r rate.Limit, b int) http.HandlerFunc { //In addition to captcha, rate limiting is implemented to prevent abuse
 	return func(w http.ResponseWriter, req *http.Request) {
-		ip, _, err := net.SplitHostPort(req.RemoteAddr)
-		if err != nil {
-			ip = req.RemoteAddr // Fallback if no port
+		ip := req.Header.Get("X-Forwarded-For")
+		if ip == "" {
+			var err error
+			ip, _, err = net.SplitHostPort(req.RemoteAddr)
+			if err != nil {
+				ip = req.RemoteAddr // Fallback if no port
+			}
 		}
 		limiter := s.getLimiter(ip, r, b)
 		if !limiter.Allow() {

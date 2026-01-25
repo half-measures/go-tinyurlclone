@@ -18,7 +18,24 @@ This will spin up:
 - **Go Backend**: API (Port 8080)
 - **Svelte Frontend**: UI (Port 3000)
 
-Once started, access the UI at [http://localhost:3000](http://localhost:3000). this was done thanks to the adapter change.
+Once started, access the UI at [http://localhost:3000](http://localhost:3000).
+
+## Production Deployment
+
+For production (e.g., AWS EC2), use the Nginx proxy and set your domain:
+
+1. Copy `.env.example` to `.env` and set your domain:
+   ```bash
+   cp .env.example .env
+   # Edit .env and set DOMAIN=http://yourdomain.com
+   ```
+2. Update `nginx.conf` if using HTTPS/SSL.
+3. Start the stack:
+   ```bash
+   docker compose up --build
+   ```
+
+The app will be accessible on port 80 via Nginx, which routes traffic to the frontend and backend.
 
 ## Configuration
 
