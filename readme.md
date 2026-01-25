@@ -18,7 +18,7 @@ This will spin up:
 - **Go Backend**: API (Port 8080)
 - **Svelte Frontend**: UI (Port 3000)
 
-Once started, access the UI at [http://localhost:3000](http://localhost:3000).
+Once started, access the UI at [http://localhost:3000](http://localhost:3000) for direct Svelte access, or [http://localhost](http://localhost) to test through the Nginx production proxy.
 
 ## Production Deployment
 
