@@ -53,3 +53,9 @@ Environment variables can be configured in `docker-compose.yml`:
 
 - `POST /shorten`: Shortens a URL.
 - `GET /:slug`: Redirects to the original URL.
+
+## Once Deployed...
+
+Any changes to svelte needs a rebuild, as it just reuses what it has.
+docker compose up -d --build will force that
+can also just do docker compose up -d --build frontend
