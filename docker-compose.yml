@@ -20,7 +20,7 @@ services:
     environment:
       MARIADB_URI: explorer:explorerpassword@tcp(mariadb:3306)/url_db?charset=utf8mb4&parseTime=True&loc=Local
       BASE_URL: ${DOMAIN:-http://localhost}
-      ALLOWED_ORIGIN: ${DOMAIN:-http://localhost}
+      ALLOWED_ORIGIN: ${DOMAIN:-*}
     depends_on:
       - mariadb
 
@@ -30,7 +30,7 @@ services:
     expose:
       - "3000"
     environment:
-      PUBLIC_API_URL: ${DOMAIN:-http://localhost}
+      PUBLIC_API_URL: ${DOMAIN:-}
     depends_on:
       - backend
 
