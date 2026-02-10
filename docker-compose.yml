@@ -21,12 +21,15 @@ services:
       - mariadb
 
   frontend:
-    build: ./gourl
+    build: 
+      context: ./gourl
+      args:
+        - PUBLIC_API_URL=https://t.michaeldev.org
     container_name: frontend_url
     expose:
       - "3000"
     environment:
-      PUBLIC_API_URL: ${DOMAIN:-}
+      PUBLIC_API_URL: https://t.michaeldev.org
     depends_on:
       - backend
 
