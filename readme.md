@@ -18,24 +18,29 @@ This will spin up:
 - **Go Backend**: API (Port 8080)
 - **Svelte Frontend**: UI (Port 3000)
 
-Once started, access the UI at [http://localhost:3000](http://localhost:3000) for direct Svelte access, or [http://localhost](http://localhost) to test through the Nginx production proxy.
+Once started, access the UI at [http://localhost](http://localhost) to test through the Nginx production proxy.
 
 ## Production Deployment
 
-For production (e.g., AWS EC2), use the Nginx proxy and set your domain:
+For production (e.g., AWS EC2 with domain `t.michaeldev.org`):
 
-1. Copy `.env.example` to `.env` and set your domain:
-   ```bash
-   cp .env.example .env
-   # Edit .env and set DOMAIN=http://yourdomain.com
+1. **Environment Config**: Create a `.env` file in the root directory:
+   ```env
+   DOMAIN=http://t.michaeldev.org
    ```
-2. Update `nginx.conf` if using HTTPS/SSL.
-3. Start the stack:
+2. **Nginx**: The included `nginx.conf` is pre-configured to handle any incoming hostname (`server_name _`).
+3. **Start**:
    ```bash
-   docker compose up --build
+   docker compose down
+   docker compose up -d --build
    ```
 
-The app will be accessible on port 80 via Nginx, which routes traffic to the frontend and backend.
+The app will be accessible on port 80. Nginx handles the routing for both the frontend and the `/shorten` API.
+
+## Troubleshooting
+
+- **Backend Unreachable**: Ensure your EC2 Security Group allows inbound traffic on port 80.
+- **localhost links**: Ensure the `DOMAIN` variable is set in `.env` before running `docker compose up`.
 
 ## Configuration
 
